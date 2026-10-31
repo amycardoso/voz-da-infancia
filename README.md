@@ -18,6 +18,7 @@ make parse        # gera os CSVs em data/processed/
 make clean-data   # gera data/processed/elenco_limpo.csv
 make stats        # resume a coleta e os CSVs
 make test         # pytest
+make model        # treina e avalia o modelo que prevê o dublador (~20 min)
 make notebooks    # reexecuta os notebooks (salvos com os gráficos)
 ```
 
@@ -35,9 +36,10 @@ make notebooks    # reexecuta os notebooks (salvos com os gráficos)
 - `parse_dubladores.py <raw> <saida.csv>`: seção "Trabalhos em Dublagem" das fichas de dublador → `dublador|ator_original|midia|obra|ano|personagem`. Falhas em `dubladores_falhas.csv`.
 - `parse_fichas.py <raw> <saida.csv>`: tabelas de filmografia das fichas de ator original, seiyuu e personagem → `pagina|tipo|obra|ano|personagem|ator_original|dublador|estudio`. É uma terceira visão da mesma rede, já organizada como ator original → dublador.
 - `clean.py [raw] [processed]`: limpa o elenco das obras → `elenco_limpo.csv`. Separa células compostas (coluna `qualificador`), marca `dublador_desconhecido`, dá um id canônico por pessoa (`p:<ficha>` ou `n:<nome>`), liga estúdio e diretor à versão (`estudio_status`) e cria `ano` numérico, `midia` padronizada, `franquia` e o gênero do ator original e do dublador. Detalhes e números em [reports/01_limpeza.md](reports/01_limpeza.md).
-- `gender.py`: gênero de uma pessoa pela ficha (categorias Atores/Atrizes, campo `sexo`, "é uma dubladora" na abertura, forma da ocupação) e, quando a ficha não diz, pelo primeiro nome no Censo 2010, só com razão ≥ 0,9. Nas 3.807 fichas de dublador que têm os dois sinais, o nome acerta 98,8%. Com isso, 99,2% das linhas de `elenco_limpo.csv` têm o gênero do dublador (98,0% pela ficha, 1,3% pelo nome); a coluna `dublador_genero_fonte` diz de onde veio.
+- `gender.py`: gênero de uma pessoa pela ficha (categorias Atores/Atrizes, campo `sexo`, "é uma dubladora" na abertura, forma da ocupação) e, quando a ficha não diz, pelo primeiro nome no Censo 2010, só com razão ≥ 0,9. Nas 3.807 fichas de dublador que têm os dois sinais, o nome acerta 98,8%. Com isso, 99,6% das linhas de `elenco_limpo.csv` têm o gênero do dublador (98,4% pela ficha, 1,2% pelo nome); a coluna `dublador_genero_fonte` diz de onde veio.
 - `stats.py`: as estatísticas abaixo.
 - `questions.py`: as quatro perguntas de [notebooks/02_perguntas.ipynb](notebooks/02_perguntas.ipynb) (concentração, mapa da escalação com networkx/Louvain, fidelidade de voz e gênero). O resumo e os gráficos principais estão em [reports/02_perguntas.md](reports/02_perguntas.md).
+- `model.py`: o modelo que prevê o dublador de um papel (baselines de popularidade, ator e diretor, e um ranker de gradient boosting sobre pares papel × candidato), com validação temporal (treino até 2017) e por franquia (GroupKFold), sem vazamento. Resultados em [notebooks/03_modelo.ipynb](notebooks/03_modelo.ipynb) e [reports/03_modelo.md](reports/03_modelo.md).
 - `explore.py`: agregados e estilo dos gráficos de [notebooks/01_exploracao.ipynb](notebooks/01_exploracao.ipynb), a exploração da base limpa (mídia e década, dubladores e atores mais frequentes, cauda longa, estúdios e diretores, gênero e lacunas).
 
 ## Estatísticas da coleta
@@ -48,8 +50,8 @@ Coleta completa em 31/10/2026, cerca de 45 minutos e nenhum erro da API.
 |---|---|
 | Páginas baixadas | 24.732: 14.300 obras, 5.283 atores originais, 4.895 fichas de dublador, 655 diretores e 324 estúdios (uma página pode ter mais de um tipo) |
 | Tamanho | 136 MB de wikitext; `data/raw/` ocupa 153 MB e `data/processed/` 92 MB |
-| `obras_elenco.csv` | 416.991 linhas (375.497 antes de ler todas as colunas de dublador); 13.670 obras |
-| `elenco_limpo.csv` | 420.758 linhas; 6.774 dubladores (98,2% das linhas ligadas a uma ficha); 109.628 atores originais |
+| `obras_elenco.csv` | 416.670 linhas (375.497 antes de ler todas as colunas de dublador); 13.670 obras |
+| `elenco_limpo.csv` | 419.825 linhas; 6.246 dubladores (98,6% das linhas ligadas a uma ficha); 109.532 atores originais |
 | `dubladores_trabalhos.csv` | 220.207 linhas; 3.787 dubladores; 47 mil atores originais; 36 mil obras |
 | `fichas_filmografia.csv` | 134.740 linhas; 5.997 fichas; 11.130 dubladores; 6.730 atores originais |
 

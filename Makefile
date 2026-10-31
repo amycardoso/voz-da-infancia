@@ -2,7 +2,7 @@ RAW ?= data/raw
 OUT ?= data/processed
 PY  ?= python3
 
-.PHONY: all collect parse clean-data stats test notebooks venv
+.PHONY: all collect parse clean-data stats test notebooks venv model
 
 all: collect parse clean-data
 
@@ -35,3 +35,7 @@ test:
 
 notebooks:
 	.venv/bin/jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb
+
+# Treina e avalia os modelos (validação temporal e por franquia) -> $(OUT)/modelo_resultados.pkl (~20 min)
+model:
+	cd scripts && ../.venv/bin/python -u model.py
