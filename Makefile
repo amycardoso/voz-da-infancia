@@ -19,8 +19,13 @@ stats:
 	$(PY) scripts/stats.py $(RAW) $(OUT)
 
 # Separa células compostas, normaliza nomes e liga estúdio/diretor à versão -> $(OUT)/elenco_limpo.csv
-clean-data:
+clean-data: data/external/nomes.csv.gz
 	$(PY) scripts/clean.py $(RAW) $(OUT)
+
+# Gênero por primeiro nome: Brasil.io "Gênero dos Nomes" (Censo 2010/IBGE, CC BY-SA 4.0)
+data/external/nomes.csv.gz:
+	mkdir -p data/external
+	curl -sfL -A "VozDaInfancia/0.1" -o $@ https://data.brasil.io/dataset/genero-nomes/nomes.csv.gz
 
 venv:
 	python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt

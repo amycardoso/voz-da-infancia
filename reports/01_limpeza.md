@@ -58,7 +58,7 @@ Entre as linhas de obras com mais de um estúdio, 46,4% foram ligadas à versão
 ## O que ainda não ficou bom
 
 - **Estúdio ambíguo em 12% das linhas.** São obras com vários estúdios em que nenhuma seção ou coluna indica a versão. Daria para cruzar com as fichas de dublador, que trazem o ano de cada trabalho.
-- **Gênero do dublador**: praticamente vazio. As opções são inferir pelo primeiro nome (lista do IBGE) ou pela forma da palavra no infobox ("Dubladora", "Ex-Dubladora").
+- **Gênero do dublador**: ~~praticamente vazio~~ resolvido depois em `scripts/gender.py`. A ficha resolve 98,0% das linhas e o primeiro nome (Censo 2010) mais 1,3%; o nome concorda com a ficha em 98,8% das fichas que têm os dois sinais.
 - **Atores originais**: só 30% estão ligados a uma ficha. Os 109 mil ids `n:` ainda contêm variações de grafia e de romanização ("Alicia Witt" e "Alicia Wit", "Wil Wheaton" e "Will Wheaton", "Hiroomi Sugino" e "Hiromi Sugino") e não tratam homônimos. O gênero do ator original só existe para quem tem ficha.
 - **Personagens**: não foram separados nem normalizados entre obras (caso 2).
 - **Qualificadores**: misturam tipos diferentes (ordem de voz, episódios, canções, idade do personagem, "?" de incerteza) e ainda não foram classificados.

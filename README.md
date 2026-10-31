@@ -6,6 +6,8 @@ A rede da dublagem brasileira: quem dubla quem, em quais obras, e um modelo que 
 
 Os dados vêm da [Dublapédia](https://dublagem.fandom.com) (dublagem.fandom.com), lida só pela API MediaWiki (`api.php`): nada de páginas HTML, User-Agent `VozDaInfancia/0.1`, até ~1 requisição por segundo e `maxlag=5`. O conteúdo da Dublapédia é licenciado sob [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/); créditos aos editores da Dublapédia. Qualquer dado derivado publicado a partir daqui mantém a atribuição e a mesma licença.
 
+Para o gênero dos dubladores sem esse dado na ficha, o projeto usa o dataset [Gênero dos Nomes](https://brasil.io/dataset/genero-nomes/) do Brasil.io (libertado por Álvaro Justen a partir do Censo 2010 do IBGE), licença [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Ele é baixado para `data/external/` pelo `make clean-data` e não é versionado.
+
 ## Como rodar
 
 A coleta, os parsers e a limpeza só usam a biblioteca padrão do Python 3. Os testes e os notebooks usam a `.venv` (`make venv`, a partir de `requirements.txt`).
@@ -33,6 +35,7 @@ make notebooks    # reexecuta os notebooks (salvos com os gráficos)
 - `parse_dubladores.py <raw> <saida.csv>`: seção "Trabalhos em Dublagem" das fichas de dublador → `dublador|ator_original|midia|obra|ano|personagem`. Falhas em `dubladores_falhas.csv`.
 - `parse_fichas.py <raw> <saida.csv>`: tabelas de filmografia das fichas de ator original, seiyuu e personagem → `pagina|tipo|obra|ano|personagem|ator_original|dublador|estudio`. É uma terceira visão da mesma rede, já organizada como ator original → dublador.
 - `clean.py [raw] [processed]`: limpa o elenco das obras → `elenco_limpo.csv`. Separa células compostas (coluna `qualificador`), marca `dublador_desconhecido`, dá um id canônico por pessoa (`p:<ficha>` ou `n:<nome>`), liga estúdio e diretor à versão (`estudio_status`) e cria `ano` numérico, `midia` padronizada, `franquia` e o gênero do ator original e do dublador. Detalhes e números em [reports/01_limpeza.md](reports/01_limpeza.md).
+- `gender.py`: gênero de uma pessoa pela ficha (categorias Atores/Atrizes, campo `sexo`, "é uma dubladora" na abertura, forma da ocupação) e, quando a ficha não diz, pelo primeiro nome no Censo 2010, só com razão ≥ 0,9. Nas 3.807 fichas de dublador que têm os dois sinais, o nome acerta 98,8%. Com isso, 99,2% das linhas de `elenco_limpo.csv` têm o gênero do dublador (98,0% pela ficha, 1,3% pelo nome); a coluna `dublador_genero_fonte` diz de onde veio.
 - `stats.py`: as estatísticas abaixo.
 - `explore.py`: agregados e estilo dos gráficos de [notebooks/01_exploracao.ipynb](notebooks/01_exploracao.ipynb), a exploração da base limpa (mídia e década, dubladores e atores mais frequentes, cauda longa, estúdios e diretores, gênero e lacunas).
 

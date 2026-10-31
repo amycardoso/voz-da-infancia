@@ -4,7 +4,7 @@
 - marca dublador desconhecido ("?", "N/A"...) sem apagar a linha;
 - normaliza nomes e dá um id canônico por pessoa, ligado à ficha quando há (link da célula, redirecionamentos, nome);
 - liga estúdio e diretor à versão certa nas obras com várias dublagens, com uma flag de como foi feito;
-- ano numérico, mídia padronizada, franquia (para validação) e gênero pelas categorias e pelo infobox.
+- ano numérico, mídia padronizada, franquia (para validação) e gênero (scripts/gender.py: ficha, depois primeiro nome).
 
 Uso: python3 scripts/clean.py [data/raw] [data/processed]
 """
@@ -13,6 +13,7 @@ from collections import Counter, defaultdict
 from pathlib import Path
 
 import wikitable
+from gender import NameGender, from_page
 from parse_obras import clean, load, parse_page, wtext
 
 # ---------------------------------------------------------------- nomes
@@ -104,7 +105,15 @@ class People:
         for t in self.fichas: self.by_key.setdefault(name_key(t), t)
         for r, t in redirects.items():
             if t in self.fichas: self.by_key.setdefault(name_key(r), t)
-        self.gender = {t: gender(d) for t, d in self.fichas.items()}
+        self.gender = {t: from_page(d) for t, d in self.fichas.items()}
+        self.names = NameGender()
+
+    def dub_gender(self, ficha, nome):
+        """(gênero, fonte) do dublador: a ficha primeiro; senão o primeiro nome (Censo 2010)."""
+        g = self.gender.get(ficha, "")
+        if g: return g, "ficha"
+        g = self.names.guess(ficha or nome)
+        return (g, "nome") if g else ("", "")
 
     def resolve(self, nome, link=""):
         """(id, ficha ou "")"""
@@ -113,17 +122,6 @@ class People:
         t = self.by_key.get(name_key(nome)) if nome else None
         if t: return "p:" + t, t
         return ("n:" + name_key(nome), "") if nome else ("", "")
-
-def gender(d):
-    """M/F pelas categorias (Atores/Atrizes, Dubladores/Dubladoras) ou pelo campo sexo do infobox."""
-    cats = set(d.get("categories", []))
-    fem, masc = {"Atrizes", "Dubladoras", "Seiyuus femininas"} & cats, {"Atores", "Dubladores masculinos"} & cats
-    if fem and not masc: return "F"
-    if masc and not fem: return "M"
-    m = re.search(r"\|\s*sexo\s*=\s*([A-Za-zçã]+)", d.get("wikitext") or "")
-    if m and m.group(1).lower().startswith("fem"): return "F"
-    if m and m.group(1).lower().startswith("masc"): return "M"
-    return ""
 
 # ---------------------------------------------------------------- estúdio e diretor por versão
 
@@ -268,7 +266,8 @@ def franchises(obras):
 
 FIELDS = ["obra", "versao", "ano", "ano_texto", "midia", "franquia", "estudio", "diretor", "estudio_status",
           "personagem", "ator_original", "ator_original_id", "ator_original_ficha", "ator_original_genero",
-          "dublador", "dublador_id", "dublador_ficha", "dublador_genero", "qualificador", "dublador_desconhecido"]
+          "dublador", "dublador_id", "dublador_ficha", "dublador_genero", "dublador_genero_fonte", "qualificador",
+          "dublador_desconhecido"]
 
 def pair(origs, dubs):
     """Cruza os pedaços das células: mesmo número -> lado a lado; senão, produto."""
@@ -304,13 +303,14 @@ def main(raw, out):
                 for o, x in pair(origs, dubs):
                     oid, ofi = people.resolve(o["nome"], o["link"])
                     did, dfi = people.resolve(x["nome"], x["link"])
+                    dg, dgf = people.dub_gender(dfi, x["nome"]) if not x["desconhecido"] else ("", "")
                     row = {"obra": t, "versao": r["versao"], "ano": ano or "", "ano_texto": r["ano"], "midia": midia,
                            "franquia": fran[t], "estudio": estudio, "diretor": diretor, "estudio_status": status,
                            "personagem": normalize_name(r["personagem"]),
                            "ator_original": (ofi or o["nome"]), "ator_original_id": oid, "ator_original_ficha": bool(ofi),
                            "ator_original_genero": people.gender.get(ofi, ""),
                            "dublador": (dfi or x["nome"]), "dublador_id": did, "dublador_ficha": bool(dfi),
-                           "dublador_genero": people.gender.get(dfi, ""),
+                           "dublador_genero": dg, "dublador_genero_fonte": dgf,
                            "qualificador": " ; ".join(filter(None, [x["qualificador"], o["qualificador"] and "original: " + o["qualificador"]])),
                            "dublador_desconhecido": x["desconhecido"]}
                     k = tuple(row.values())
