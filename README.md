@@ -37,6 +37,7 @@ make notebooks    # reexecuta os notebooks (salvos com os gráficos)
 - `clean.py [raw] [processed]`: limpa o elenco das obras → `elenco_limpo.csv`. Separa células compostas (coluna `qualificador`), marca `dublador_desconhecido`, dá um id canônico por pessoa (`p:<ficha>` ou `n:<nome>`), liga estúdio e diretor à versão (`estudio_status`) e cria `ano` numérico, `midia` padronizada, `franquia` e o gênero do ator original e do dublador. Detalhes e números em [reports/01_limpeza.md](reports/01_limpeza.md).
 - `gender.py`: gênero de uma pessoa pela ficha (categorias Atores/Atrizes, campo `sexo`, "é uma dubladora" na abertura, forma da ocupação) e, quando a ficha não diz, pelo primeiro nome no Censo 2010, só com razão ≥ 0,9. Nas 3.807 fichas de dublador que têm os dois sinais, o nome acerta 98,8%. Com isso, 99,2% das linhas de `elenco_limpo.csv` têm o gênero do dublador (98,0% pela ficha, 1,3% pelo nome); a coluna `dublador_genero_fonte` diz de onde veio.
 - `stats.py`: as estatísticas abaixo.
+- `questions.py`: as quatro perguntas de [notebooks/02_perguntas.ipynb](notebooks/02_perguntas.ipynb) (concentração, mapa da escalação com networkx/Louvain, fidelidade de voz e gênero). O resumo e os gráficos principais estão em [reports/02_perguntas.md](reports/02_perguntas.md).
 - `explore.py`: agregados e estilo dos gráficos de [notebooks/01_exploracao.ipynb](notebooks/01_exploracao.ipynb), a exploração da base limpa (mídia e década, dubladores e atores mais frequentes, cauda longa, estúdios e diretores, gênero e lacunas).
 
 ## Estatísticas da coleta
