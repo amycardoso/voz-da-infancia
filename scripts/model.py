@@ -374,6 +374,29 @@ def metricas_validacoes(resultado):
         for mod, met in tabela(_res(resultado, v)).items(): out.append((v, mod, met))
     return out
 
+def sugestao_elenco(resultado, ks=(1, 5, 10, 20)):
+    """{validação: {modelo: {"top-k": %}}}: a fração de papéis em que o dublador real está entre os k primeiros,
+    calculada a partir das posições já salvas (sem retreinar)."""
+    out = {}
+    for v in ("temporal", "franquia"):
+        res = _res(resultado, v)
+        out[v] = {mod: {f"top-{k}": 100 * sum(x["ranks"][mod] <= k for x in res) / len(res) for k in ks} for mod in MODELOS}
+    return out
+
+def curva_topk(resultado, validacao="temporal", kmax=30):
+    """{modelo: [% com o dublador real entre os k primeiros, k = 1..kmax]}."""
+    res = _res(resultado, validacao)
+    return {mod: [100 * sum(x["ranks"][mod] <= k for x in res) / len(res) for k in range(1, kmax + 1)] for mod in MODELOS}
+
+def sugestao_por_recorte(resultado, k=20, validacao="temporal"):
+    """Top-k do ranker e do baseline do ator para atores vistos e novos."""
+    res = _res(resultado, validacao)
+    out = {}
+    for nome, f in (("ator visto no treino", lambda x: x["ator_visto"]), ("ator novo", lambda x: not x["ator_visto"])):
+        sub = [x for x in res if f(x)]
+        out[nome] = {mod: 100 * sum(x["ranks"][mod] <= k for x in sub) / len(sub) for mod in ("ator", "ranker")}
+    return out
+
 def recortes_validacoes(resultado, metrica="top-5"):
     """{validação: {recorte: {modelo: valor}}} com o n de cada recorte."""
     out = {}

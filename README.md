@@ -1,78 +1,100 @@
 # Voz da Infância
 
-A rede da dublagem brasileira: quem dubla quem, em quais obras, e um modelo que prevê o dublador de um personagem.
+**Quem dubla quem no Brasil, e dá para prever a voz brasileira de um personagem?**
 
-## Fonte
+A rede da dublagem brasileira montada a partir de 420 mil papéis catalogados na [Dublapédia](https://dublagem.fandom.com): 13,7 mil obras, 6,2 mil dubladores, 110 mil atores originais. A coleta, a limpeza, quatro perguntas sobre a rede e um modelo que tenta prever o dublador estão em três notebooks:
 
-Os dados vêm da [Dublapédia](https://dublagem.fandom.com) (dublagem.fandom.com), lida só pela API MediaWiki (`api.php`): nada de páginas HTML, User-Agent `VozDaInfancia/0.1`, até ~1 requisição por segundo e `maxlag=5`. O conteúdo da Dublapédia é licenciado sob [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/); créditos aos editores da Dublapédia. Qualquer dado derivado publicado a partir daqui mantém a atribuição e a mesma licença.
+1. [Exploração](notebooks/01_exploracao.ipynb): tamanho e cobertura da base, dubladores e atores mais frequentes, estúdios, lacunas.
+2. [Quatro perguntas](notebooks/02_perguntas.ipynb): concentração, mapa da escalação, fidelidade de voz e gênero.
+3. [O modelo](notebooks/03_modelo.ipynb): prever o dublador de um papel, com validação temporal e por franquia.
 
-Para o gênero dos dubladores sem esse dado na ficha, o projeto usa o dataset [Gênero dos Nomes](https://brasil.io/dataset/genero-nomes/) do Brasil.io (libertado por Álvaro Justen a partir do Censo 2010 do IBGE), licença [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Ele é baixado para `data/external/` pelo `make clean-data` e não é versionado.
+## Quatro achados
 
-## Como rodar
+**1. A escalação se divide entre Rio e São Paulo.** No grafo de quem trabalha com quem (dubladores e diretores com duas ou mais obras em comum), as comunidades encontradas pelo algoritmo de Louvain seguem a cidade. As quatro maiores são duas paulistas e duas cariocas, e 97% das pessoas com cidade conhecida caem numa comunidade da sua cidade. Diretores têm elenco fixo: na mediana, 63% dos papéis de um diretor vão para dubladores com quem ele já fez 5 ou mais obras.
 
-A coleta, os parsers e a limpeza só usam a biblioteca padrão do Python 3. Os testes e os notebooks usam a `.venv` (`make venv`, a partir de `requirements.txt`).
+![Comunidades por cidade](reports/figs/02_comunidades_cidade.png)
+
+**2. Poucos fazem quase tudo.** Os 10% de dubladores mais ativos fazem 83% dos papéis (Gini 0,87). A concentração caiu nas obras recentes: a fatia dos 50 mais ativos foi de 32% (anos 80) para 18% (anos 2020).
+
+![Curva de Lorenz](reports/figs/01_lorenz.png)
+
+**3. A "voz fixa" é exceção.** Entre atores de live-action com 3 ou mais obras, na mediana só 33% das obras têm o mesmo dublador, e só 2% passam de 80%. Os clássicos existem (Adam Sandler e Alexandre Moreno em 78% das obras, Tom Hanks e Marco Ribeiro em 71%), mas são poucos. Quando uma obra é redublada, o dublador muda em 92% dos personagens.
+
+![Fidelidade de voz](reports/figs/03_fidelidade.png)
+
+**4. Mais mulheres na dublagem, e o caso do anime.** Dubladoras fazem 34% dos papéis, e a fatia cresce em todas as mídias: no live-action, de 23% (obras dos anos 70) para 41% (anos 2020). No anime, seiyuus mulheres que fazem meninos no Japão ganham um dublador homem no Brasil em 13% dos papéis: a voz japonesa de Goku é Masako Nozawa; a brasileira, Wendel Bezerra.
+
+![Dubladoras por década](reports/figs/04_genero_decada.png)
+
+## O modelo: a voz da sua infância é menos previsível do que parece
+
+Dado um papel (ator original, obra, ano, mídia, estúdio, diretor e gênero do ator), o modelo ordena os dubladores candidatos. O ranker é um gradient boosting sobre pares papel × candidato, comparado com três baselines. A avaliação é feita sem vazamento: **temporal** (treino com obras até 2017, teste de 2018 em diante) e **por franquia** (GroupKFold, para nenhuma continuação ficar de um lado e a original do outro).
+
+| validação | modelo | top-1 | top-5 | top-20 |
+|---|---|---:|---:|---:|
+| temporal | popularidade | 0,5% | 1,7% | 5,6% |
+| temporal | dublador mais frequente do ator | 4,3% | 8,8% | 13,8% |
+| temporal | **ranker** | **4,5%** | **9,7%** | **19,8%** |
+| franquia | dublador mais frequente do ator | 5,6% | 12,4% | 20,7% |
+| franquia | **ranker** | **6,7%** | **14,3%** | **28,9%** |
+
+Acertar o nome exato é difícil. O personagem não está nos dados, cerca de 16% dos papéis são vozes adicionais, e atores de voz como Dan Castellaneta ou Frank Welker fazem dezenas de personagens, cada um com uma voz brasileira diferente. O modelo ajuda onde o histórico do ator não diz nada. Para atores que nunca apareceram no treino, o dublador certo entra no top-20 em 13,3% dos papéis, contra 3,4% do baseline. Como **sugestão de elenco**, uma lista curta para um diretor conferir, é mais útil do que como adivinho. Detalhes em [reports/03_modelo.md](reports/03_modelo.md).
+
+![Sugestão de elenco](reports/figs/08_sugestao_elenco.png)
+
+## Como reproduzir
+
+Coleta, parsers e limpeza só usam a biblioteca padrão do Python 3. Testes, notebooks e modelo usam a `.venv`.
 
 ```bash
-make collect      # baixa (ou retoma) o wikitext e os redirecionamentos para data/raw/
-make parse        # gera os CSVs em data/processed/
-make clean-data   # gera data/processed/elenco_limpo.csv
-make stats        # resume a coleta e os CSVs
+make venv         # cria a .venv a partir de requirements.txt
+make collect      # baixa (ou retoma) o wikitext pela API MediaWiki para data/raw/ (~45 min, ~150 MB)
+make parse        # tabelas de elenco e filmografias -> data/processed/*.csv
+make clean-data   # limpeza, ids de pessoa, gênero -> data/processed/elenco_limpo.csv
+make model        # treina e avalia o modelo (~20 min)
+make notebooks    # reexecuta os três notebooks
 make test         # pytest
-make model        # treina e avalia o modelo que prevê o dublador (~20 min)
-make notebooks    # reexecuta os notebooks (salvos com os gráficos)
 ```
 
-`make` sozinho roda `collect`, `parse` e `clean-data`. A coleta pode ser interrompida e rodada de novo: as listas já salvas e os títulos já baixados são pulados.
+A coleta usa só a API (`api.php`), com User-Agent próprio, cerca de 1 requisição por segundo e `maxlag`. Ela pode ser interrompida e retomada.
 
-## Scripts
+## Estrutura
 
-- `collect.py [data/raw]`: lista os títulos de cada categoria e infobox (`data/raw/lists/`), baixa a revisão atual (wikitext + categorias) em lotes de 50 (`data/raw/pages/part-NNNN.jsonl`) e salva os redirecionamentos que apontam para cada ficha de pessoa (`data/raw/redirects.json`). Cada página leva os tipos de que faz parte em `kinds`.
-  - obras: categorias Filmes, Desenhos animados, Séries, Anime, Jogos Eletrônicos, Novelas e Redublagem, mais as páginas com `Infobox de produção` (com ou sem etapas);
-  - dubladores: `Infobox de dublador` e a categoria Dubladores;
-  - atores originais: `Infobox de ator` e as categorias Atores e Atrizes;
-  - estúdios: `Infobox de estúdio`; diretores: categoria Diretores de Dublagem.
-- `wikitable.py`: lê tabelas MediaWiki (`{| … |}`) direto do wikitext, com rowspan e colspan.
-- `parse_obras.py <raw> <saida.csv>`: tabelas de elenco das obras → `obra|versao|ano|midia|estudio|diretor|personagem|ator_original|dublador`. `versao` é o título da seção (Elenco, uma redublagem, uma temporada…), mais o rótulo da coluna quando a tabela tem uma coluna de dublador por dublagem ("Elenco — Herbert Richers"). As páginas que falham vão para `obras_falhas.csv` com o motivo.
-- `parse_dubladores.py <raw> <saida.csv>`: seção "Trabalhos em Dublagem" das fichas de dublador → `dublador|ator_original|midia|obra|ano|personagem`. Falhas em `dubladores_falhas.csv`.
-- `parse_fichas.py <raw> <saida.csv>`: tabelas de filmografia das fichas de ator original, seiyuu e personagem → `pagina|tipo|obra|ano|personagem|ator_original|dublador|estudio`. É uma terceira visão da mesma rede, já organizada como ator original → dublador.
-- `clean.py [raw] [processed]`: limpa o elenco das obras → `elenco_limpo.csv`. Separa células compostas (coluna `qualificador`), marca `dublador_desconhecido`, dá um id canônico por pessoa (`p:<ficha>` ou `n:<nome>`), liga estúdio e diretor à versão (`estudio_status`) e cria `ano` numérico, `midia` padronizada, `franquia` e o gênero do ator original e do dublador. Detalhes e números em [reports/01_limpeza.md](reports/01_limpeza.md).
-- `gender.py`: gênero de uma pessoa pela ficha (categorias Atores/Atrizes, campo `sexo`, "é uma dubladora" na abertura, forma da ocupação) e, quando a ficha não diz, pelo primeiro nome no Censo 2010, só com razão ≥ 0,9. Nas 3.807 fichas de dublador que têm os dois sinais, o nome acerta 98,8%. Com isso, 99,6% das linhas de `elenco_limpo.csv` têm o gênero do dublador (98,4% pela ficha, 1,2% pelo nome); a coluna `dublador_genero_fonte` diz de onde veio.
-- `stats.py`: as estatísticas abaixo.
-- `questions.py`: as quatro perguntas de [notebooks/02_perguntas.ipynb](notebooks/02_perguntas.ipynb) (concentração, mapa da escalação com networkx/Louvain, fidelidade de voz e gênero). O resumo e os gráficos principais estão em [reports/02_perguntas.md](reports/02_perguntas.md).
-- `model.py`: o modelo que prevê o dublador de um papel (baselines de popularidade, ator e diretor, e um ranker de gradient boosting sobre pares papel × candidato), com validação temporal (treino até 2017) e por franquia (GroupKFold), sem vazamento. Resultados em [notebooks/03_modelo.ipynb](notebooks/03_modelo.ipynb) e [reports/03_modelo.md](reports/03_modelo.md).
-- `explore.py`: agregados e estilo dos gráficos de [notebooks/01_exploracao.ipynb](notebooks/01_exploracao.ipynb), a exploração da base limpa (mídia e década, dubladores e atores mais frequentes, cauda longa, estúdios e diretores, gênero e lacunas).
+```
+scripts/
+  collect.py           coleta pela API MediaWiki (retomável)
+  wikitable.py         lê tabelas {| … |} do wikitext, com rowspan/colspan
+  parse_obras.py       elenco das obras -> obras_elenco.csv
+  parse_dubladores.py  "Trabalhos em Dublagem" das fichas -> dubladores_trabalhos.csv
+  parse_fichas.py      filmografias de atores, seiyuus e personagens -> fichas_filmografia.csv
+  clean.py             células compostas, ids de pessoa, estúdio por versão, franquias
+  gender.py            gênero pela ficha e pelo primeiro nome (Censo 2010)
+  explore.py           agregados do notebook 01
+  questions.py         as quatro perguntas do notebook 02
+  model.py             baselines, ranker e avaliação do notebook 03
+  stats.py             resumo da coleta
+notebooks/             01_exploracao, 02_perguntas, 03_modelo (com os gráficos salvos)
+reports/               01_limpeza, 02_perguntas, 03_modelo e as figuras em reports/figs/
+tests/                 separador de células, nomes, gênero e testes de vazamento do modelo
+```
 
-## Estatísticas da coleta
+Os dados (`data/`) não são versionados.
 
-Coleta completa em 31/10/2026, cerca de 45 minutos e nenhum erro da API.
+## Limitações
 
-| | |
-|---|---|
-| Páginas baixadas | 24.732: 14.300 obras, 5.283 atores originais, 4.895 fichas de dublador, 655 diretores e 324 estúdios (uma página pode ter mais de um tipo) |
-| Tamanho | 136 MB de wikitext; `data/raw/` ocupa 153 MB e `data/processed/` 92 MB |
-| `obras_elenco.csv` | 416.670 linhas (375.497 antes de ler todas as colunas de dublador); 13.670 obras |
-| `elenco_limpo.csv` | 419.825 linhas; 6.246 dubladores (98,6% das linhas ligadas a uma ficha); 109.532 atores originais |
-| `dubladores_trabalhos.csv` | 220.207 linhas; 3.787 dubladores; 47 mil atores originais; 36 mil obras |
-| `fichas_filmografia.csv` | 134.740 linhas; 5.997 fichas; 11.130 dubladores; 6.730 atores originais |
+- **A Dublapédia é uma wiki**: a cobertura mede o que os editores catalogaram. Obras antigas e vozes adicionais estão sub-representadas, e "papel" depende de quanto cada página detalha o elenco.
+- **Gênero do ator original**: só existe para quem tem ficha (27% dos papéis). Ele também serve de proxy do gênero do personagem, o que falha justamente no anime. O gênero do dublador cobre 99,6% dos papéis (98,4% pela ficha, 1,2% pelo primeiro nome).
+- **Atores sem ficha**: 70% dos papéis. Eles ainda aparecem com grafias diferentes da mesma pessoa ("Wil" e "Will Wheaton").
+- **Estúdio e diretor**: ficam ambíguos em 12% dos papéis, em obras com várias dublagens que não dizem qual estúdio fez qual versão.
+- **Cidade**: vem só das categorias das fichas, e um quarto das pessoas da rede fica sem ela.
+- **Modelo**: o ranker é treinado e avaliado em amostras (20 mil e 8 mil papéis no temporal). O dublador real só está na lista de candidatos em 38% dos papéis temporais.
 
-Taxa de parse:
+Mais detalhes em [reports/01_limpeza.md](reports/01_limpeza.md), [reports/02_perguntas.md](reports/02_perguntas.md) e [reports/03_modelo.md](reports/03_modelo.md).
 
-- Obras: 13.670 de 14.300 páginas têm elenco (95,6%).
-- Fichas de dublador: 3.787 de 4.895 têm "Trabalhos em Dublagem" (77,4%). Das 1.108 que ficam de fora, 885 são de personagens ou seiyuus, que o `parse_fichas.py` aproveita.
+## Créditos e licenças
 
-Falhas mais comuns (obras):
-
-| Páginas | Motivo |
-|---|---|
-| 350 | Produção nacional: a tabela só tem vozes originais, não é dublagem |
-| 138 | Tabelas sem colunas Personagem/Dublador (só transmissão ou home vídeo, ou cabeçalho fora do padrão) |
-| 60 | Seção Elenco sem tabela (lista ou vazia) |
-| 44 | Página sem nenhuma tabela |
-| 25 | Elenco montado por predefinição |
-
-As limitações que ficaram depois da limpeza estão em [reports/01_limpeza.md](reports/01_limpeza.md#o-que-ainda-não-ficou-bom).
-
-## Licença
-
-- Código: [MIT](LICENSE).
-- Dados derivados: CC BY-SA 3.0, com atribuição à Dublapédia. Não são versionados (`data/` e `raw/` estão no `.gitignore`).
+- **Fonte**: [Dublapédia](https://dublagem.fandom.com), dublagem.fandom.com, lida pela API MediaWiki. Conteúdo sob [CC BY-SA 3.0](https://creativecommons.org/licenses/by-sa/3.0/); créditos aos editores da Dublapédia.
+- **Gênero por nome**: [Gênero dos Nomes](https://brasil.io/dataset/genero-nomes/), do Brasil.io (libertado por Álvaro Justen a partir do Censo 2010 do IBGE), sob [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/).
+- **Código**: [MIT](LICENSE).
+- **Dados derivados** (`data/processed/`): CC BY-SA 3.0, com atribuição à Dublapédia. Não são versionados; para obtê-los, rode o pipeline acima.
+- **Inspiração**: os ensaios visuais de dados do [The Pudding](https://pudding.cool).
