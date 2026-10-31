@@ -4,7 +4,8 @@ Uso: python3 scripts/collect.py [pasta_raw]   (padrão: data/raw)
 
 1. Lista os títulos (ns 0) de cada categoria e de cada infobox -> <raw>/lists/<nome>.json
 2. Baixa revisões em lotes de 50 (wikitext + categorias) -> <raw>/pages/part-NNNN.jsonl
-   Rodar de novo pula as listas já salvas e os títulos já baixados.
+3. Lista os redirecionamentos que apontam para cada ficha de pessoa -> <raw>/redirects.json
+   Rodar de novo pula as listas já salvas, os títulos já baixados e os redirecionamentos já salvos.
 """
 import json, sys, time, urllib.error, urllib.parse, urllib.request
 from pathlib import Path
@@ -79,6 +80,19 @@ def fetch_batch(titles):
         if "continue" not in d: return list(pages.values())
         cont = {k: v for k, v in d["continue"].items()}
 
+PEOPLE = ("dublador", "ator", "diretor")
+
+def fetch_redirects(titles):
+    """{redirecionamento: ficha} para até 50 fichas por chamada."""
+    out, cont = {}, {}
+    while True:
+        d = api(action="query", titles="|".join(titles), prop="redirects", rdlimit="max",
+                rdnamespace=0, rdprop="title", **cont)
+        for pg in d["query"].get("pages", []):
+            for r in pg.get("redirects", []): out[r["title"]] = pg["title"]
+        if "continue" not in d: return out
+        cont = dict(d["continue"])
+
 def main():
     (RAW / "lists").mkdir(parents=True, exist_ok=True)
     (RAW / "pages").mkdir(parents=True, exist_ok=True)
@@ -110,6 +124,16 @@ def main():
                 fh.write(json.dumps(pg, ensure_ascii=False) + "\n")
         n += 1
         print(f"  {min(i + BATCH, len(todo))}/{len(todo)}", flush=True)
+
+    rf = RAW / "redirects.json"
+    if not rf.exists():
+        people = sorted(t for t, k in kinds.items() if k & set(PEOPLE))
+        red = {}
+        for i in range(0, len(people), BATCH):
+            red.update(fetch_redirects(people[i:i + BATCH]))
+            print(f"  redirecionamentos: {min(i + BATCH, len(people))}/{len(people)}", flush=True)
+        rf.write_text(json.dumps(red, ensure_ascii=False))
+    print(f"redirecionamentos para fichas: {len(json.loads(rf.read_text()))}", flush=True)
 
 if __name__ == "__main__":
     main()

@@ -2,9 +2,9 @@ RAW ?= data/raw
 OUT ?= data/processed
 PY  ?= python3
 
-.PHONY: all collect parse stats
+.PHONY: all collect parse clean-data stats test notebooks venv
 
-all: collect parse
+all: collect parse clean-data
 
 # Baixa (ou retoma) o wikitext das obras e fichas pela API MediaWiki.
 collect:
@@ -17,3 +17,16 @@ parse:
 
 stats:
 	$(PY) scripts/stats.py $(RAW) $(OUT)
+
+# Separa células compostas, normaliza nomes e liga estúdio/diretor à versão -> $(OUT)/elenco_limpo.csv
+clean-data:
+	$(PY) scripts/clean.py $(RAW) $(OUT)
+
+venv:
+	python3 -m venv .venv && .venv/bin/pip install -q -r requirements.txt
+
+test:
+	.venv/bin/pytest -q tests
+
+notebooks:
+	.venv/bin/jupyter nbconvert --to notebook --execute --inplace notebooks/*.ipynb

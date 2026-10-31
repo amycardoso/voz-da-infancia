@@ -1,0 +1,5 @@
+pytest>=8
+matplotlib>=3.9
+jupyter>=1.1
+nbconvert>=7.16
+ipykernel>=6.29

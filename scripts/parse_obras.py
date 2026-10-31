@@ -53,6 +53,9 @@ def grid(rows):
 
 clean = lambda s: re.sub(r"\s*;\s*$", "", re.sub(r"\s+", " ", s)).strip(" ;|")
 
+DUB = ("dublador", "dublagem", "voz brasileira", "dubladora", "versão brasileira")
+FOREIGN = re.compile(r"(?i)\b(eua|estados unidos|japão|japonês|inglês|méxico|espanhol|latin|portugal|original(?:es)?)\b(?<!dublagem original)")
+
 def cast_rows(table):
     g = grid(table["rows"])
     if g and not any(c["h"] for c in g[0]) and any("personage" in c["text"].lower() for c in g[0]):
@@ -65,24 +68,38 @@ def cast_rows(table):
     body = [r for r in g[lead:] if r and not is_hdr(r) and not divider(r)]
     if not hdr or not body: return None
     ncol = max(len(r) for r in g)
-    names = [" ".join(dict.fromkeys(clean(r[i]["text"]) for r in hdr if i < len(r))).lower() for i in range(ncol)]
+    shown = [" ".join(dict.fromkeys(clean(r[i]["text"]) for r in hdr if i < len(r))) for i in range(ncol)]
+    names = [n.lower() for n in shown]
     find = lambda *keys: next((i for i, n in enumerate(names) if any(k in n for k in keys)), None)
     ip = find("personage", "persongem", "papel")
-    idub = find("dublador", "dublagem", "voz brasileira", "dubladora", "versão brasileira")
+    is_dub = lambda n: any(k in n for k in DUB) and "personage" not in n
+    foreign = [i for i, n in enumerate(names) if is_dub(n) and FOREIGN.search(n)]
+    idubs = [i for i, n in enumerate(names) if is_dub(n) and i not in foreign]
     iorig = find("diálogo") if find("diálogo") is not None else find("origina", "seiy", "ator", "atriz", "intérprete", "elenco")
+    if iorig in idubs: iorig = None
+    if iorig is None and foreign: iorig = foreign[0]  # "Dublador (EUA)": a voz original
     real = False
-    if ip is None and idub is not None:
+    if ip is None and idubs:
         ip = find("pessoa", "participante", "apresenta", "jurado", "convidado", "elenco")
         real = ip is not None  # reality/documentário: a pessoa é o próprio original
-        if ip is None and names and not names[0].strip() and idub != 0: ip = 0  # 1ª coluna sem título
-    if ip is None or idub is None or idub == ip: return None
+        if ip is None and names and not names[0].strip() and 0 not in idubs: ip = 0  # 1ª coluna sem título
+    idubs = [i for i in idubs if i != ip]
+    if ip is None or not idubs: return None
     if real: iorig = ip
-    elif iorig in (ip, idub): iorig = None
+    elif iorig == ip: iorig = None
+    # várias colunas de dublador = várias dublagens; o rótulo da coluna vai para a versão
+    label = lambda i: clean(re.sub(r"(?i)dublador(?:e?s|a|\(a\)|\(es\))?|dubladoras?|dublagem|voz brasileira|[()]", " ", shown[i]))
+    labels = {i: (label(i) or f"coluna {k + 1}") if len(idubs) > 1 else "" for k, i in enumerate(idubs)}
     res = []
     for r in body:
         get = lambda i: clean(r[i]["text"]) if i is not None and i < len(r) else ""
-        p, d = get(ip), get(idub)
-        if p and d: res.append((p, get(iorig), d))
+        raw = lambda i: r[i].get("raw", "") if i is not None and i < len(r) else ""
+        p = get(ip)
+        for i in idubs:
+            d = get(i)
+            if p and d:
+                res.append({"personagem": p, "ator_original": get(iorig), "dublador": d, "coluna": labels[i],
+                            "_dub_wt": raw(i), "_orig_wt": raw(iorig)})
     return res
 
 def infobox(wt, *keys):
@@ -132,14 +149,15 @@ def parse_page(d):
     rows, n_cast = [], 0
     for t in tabs:
         for r in t["rows"]:
-            for c in r: c["text"] = wtext(c["text"])
+            for c in r: c["raw"], c["text"] = c["text"], wtext(c["text"])
         cr = cast_rows(t)
         if cr is None: continue
         n_cast += 1
-        for per, orig, dub in cr:
-            rows.append({"obra": meta["obra"], "versao": clean(wtext(t["heading"])), "ano": meta["ano"],
-                         "midia": meta["midia"], "estudio": meta["estudio"], "diretor": meta["diretor"],
-                         "personagem": per, "ator_original": orig, "dublador": dub})
+        sec = clean(wtext(t["heading"]))
+        for x in cr:
+            versao = " — ".join(v for v in (sec, x.pop("coluna")) if v)
+            rows.append({"obra": meta["obra"], "versao": versao, "ano": meta["ano"], "midia": meta["midia"],
+                         "estudio": meta["estudio"], "diretor": meta["diretor"], **x})
     if rows: return rows, ""
     if n_cast: return [], "tabela de elenco sem linhas preenchidas"
     heads = [" ".join(c["text"] for c in t["rows"][0]).lower() for t in tabs if t["rows"]]
@@ -154,7 +172,7 @@ if __name__ == "__main__":
     out.parent.mkdir(parents=True, exist_ok=True)
     fails, n_pages, n_ok, seen = Counter(), 0, 0, set()
     with out.open("w", newline="") as fh, (out.parent / "obras_falhas.csv").open("w", newline="") as ff:
-        w = csv.DictWriter(fh, fieldnames=FIELDS); w.writeheader()
+        w = csv.DictWriter(fh, fieldnames=FIELDS, extrasaction="ignore"); w.writeheader()
         wf = csv.writer(ff); wf.writerow(["obra", "motivo"])
         for d in load(raw, "obra"):
             n_pages += 1
@@ -162,7 +180,7 @@ if __name__ == "__main__":
             if why: fails[why] += 1; wf.writerow([d["title"], why]); continue
             n_ok += 1
             for r in rows:
-                k = tuple(r.values())
+                k = tuple(r[f] for f in FIELDS)
                 if k in seen: continue  # rowspan em colunas ignoradas duplica linhas
                 seen.add(k); w.writerow(r)
     print(f"obras: {n_pages} | com elenco: {n_ok} ({n_ok / max(n_pages, 1):.1%}) | linhas: {len(seen)}")
