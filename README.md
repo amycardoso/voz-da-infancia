@@ -16,6 +16,7 @@ make parse        # gera os CSVs em data/processed/
 make clean-data   # gera data/processed/elenco_limpo.csv
 make stats        # resume a coleta e os CSVs
 make test         # pytest
+make notebooks    # reexecuta os notebooks (salvos com os gráficos)
 ```
 
 `make` sozinho roda `collect`, `parse` e `clean-data`. A coleta pode ser interrompida e rodada de novo: as listas já salvas e os títulos já baixados são pulados.
@@ -33,6 +34,7 @@ make test         # pytest
 - `parse_fichas.py <raw> <saida.csv>`: tabelas de filmografia das fichas de ator original, seiyuu e personagem → `pagina|tipo|obra|ano|personagem|ator_original|dublador|estudio`. É uma terceira visão da mesma rede, já organizada como ator original → dublador.
 - `clean.py [raw] [processed]`: limpa o elenco das obras → `elenco_limpo.csv`. Separa células compostas (coluna `qualificador`), marca `dublador_desconhecido`, dá um id canônico por pessoa (`p:<ficha>` ou `n:<nome>`), liga estúdio e diretor à versão (`estudio_status`) e cria `ano` numérico, `midia` padronizada, `franquia` e o gênero do ator original e do dublador. Detalhes e números em [reports/01_limpeza.md](reports/01_limpeza.md).
 - `stats.py`: as estatísticas abaixo.
+- `explore.py`: agregados e estilo dos gráficos de [notebooks/01_exploracao.ipynb](notebooks/01_exploracao.ipynb), a exploração da base limpa (mídia e década, dubladores e atores mais frequentes, cauda longa, estúdios e diretores, gênero e lacunas).
 
 ## Estatísticas da coleta
 
