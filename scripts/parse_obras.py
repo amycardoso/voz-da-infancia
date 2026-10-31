@@ -54,7 +54,8 @@ def grid(rows):
 clean = lambda s: re.sub(r"\s*;\s*$", "", re.sub(r"\s+", " ", s)).strip(" ;|")
 
 DUB = ("dublador", "dublagem", "voz brasileira", "dubladora", "versão brasileira")
-FOREIGN = re.compile(r"(?i)\b(eua|estados unidos|japão|japonês|inglês|méxico|espanhol|latin|portugal|original(?:es)?)\b(?<!dublagem original)")
+FOREIGN = re.compile(r"(?i)\b(eua|estados unidos|canad\w*|american[oa]s?|japão|japon[eê]s[a]?|ingl[eê]s[a]?|méxico|"
+                     r"espanhol|latin|portugal|original(?:es)?)\b(?<!dublagem original)")
 
 def cast_rows(table):
     g = grid(table["rows"])

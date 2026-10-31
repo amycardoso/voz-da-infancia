@@ -22,7 +22,8 @@ QUOTES = str.maketrans({"“": '"', "”": '"', "„": '"', "«": '"', "»": '"'
 # marcadores de vaga; "Dublador Desconhecido nº 6" NÃO entra: é uma voz recorrente com ficha própria
 UNKNOWN = re.compile(r"(?i)^(\?+|n/?[ad]|-+|—|–|desconhecid[oa]s?|(ainda )?não (identificad|creditad|confirmad|revelad|especificad)[oa]s?|"
                      r"sem dublagem|não dublad[oa]|(a|por) (confirmar|identificar|adicionar)|sem identificar|indefinid[oa]|"
-                     r"ninguém|sem diálogos?|não aparece)$")
+                     r"ninguém|sem di[aá]l[oó]gos?|sem falas?|não aparece|¿\?+|mantid[oa] no original.*|gravação original|"
+                     r"voz original|original)$")
 # no lado do ator original, papéis que não são uma pessoa
 NOT_PERSON = re.compile(r"(?i)^(locução( e placas)?|locutora?|narra(dor|dora|ção)|vários|vozes adicionais)$")
 
@@ -33,7 +34,7 @@ def normalize_name(s):
     s = re.sub(r"\{\{|\}\}|'{2,}|<[^>]*>|\(\s*\)", "", s).replace("_", " ")
     s = re.sub(r"\s+", " ", s).strip(" ;,.:-–—|*\t")
     if s.count('"') == 2 and s.startswith('"') and s.endswith('"'): s = s[1:-1].strip()
-    return s
+    return s if re.search(r"\w", s) else ""
 
 def name_key(s):
     """Chave de comparação: sem acentos, minúsculas, só letras e dígitos."""
@@ -60,9 +61,27 @@ def _segments(wt):
     s = re.sub(r"(?i)<hr[^>]*>|<br\s*/?>|\n", "\x00", s)
     parts = []
     for p in s.split("\x00"):
-        for q in wikitable.split_top(p, ";"):
-            parts += wikitable.split_top(q, " / ")
+        for q in _split_outside(p, ";"):
+            parts += _split_outside(q, " / ")
     return [p for p in parts if p.strip()]
+
+def _split_outside(s, sep):
+    """Divide em sep fora de [[...]], {{...}} e (...): "X (criança; 1ª temp.)" fica inteiro."""
+    out, depth, i, start = [], 0, 0, 0
+    while i < len(s):
+        two = s[i:i + 2]
+        if two in ("[[", "{{"): depth += 1; i += 2; continue
+        if two in ("]]", "}}"): depth = max(0, depth - 1); i += 2; continue
+        if s[i] == "(": depth += 1
+        elif s[i] == ")": depth = max(0, depth - 1)
+        elif depth == 0 and s.startswith(sep, i):
+            out.append(s[start:i]); i += len(sep); start = i; continue
+        i += 1
+    out.append(s[start:])
+    return out
+
+# pedaço que é só episódio, temporada ou ordinal ("1x06", "2ª", "1ª-4ª Temp"): vira qualificador
+SO_QUALIFICADOR = re.compile(r"(?i)^[\d\sªºx,.\-–]+(?:temp\w*|eps?\.?|epis[oó]dios?|cap\w*)?\.?$")
 
 def _split_links(seg):
     """'[[A]] e [[B]]' ou '[[A]], [[B]]' -> dois pedaços; o resto fica inteiro."""
@@ -86,9 +105,13 @@ def split_cell(wt):
             text = re.sub(r"\s+", " ", wtext(piece)).strip()
             quals = [q.strip() for q in PAREN.findall(text) if q.strip()]
             nome = normalize_name(PAREN.sub(" ", text))
+            if nome and SO_QUALIFICADOR.match(nome) and not link:
+                quals, nome = [nome] + quals, ""
+            nome = nome.lstrip("(").strip() if nome.count("(") > nome.count(")") else nome
             if not nome and quals and out:
                 out[-1]["qualificador"] = " ; ".join(filter(None, [out[-1]["qualificador"], *quals])); continue
-            if not nome and not quals: continue
+            bare = re.sub(r"\s+", " ", PAREN.sub(" ", text)).strip()
+            if not nome and not quals and not bare: continue
             unk = not nome or bool(UNKNOWN.match(nome))
             out.append({"nome": "" if unk else nome, "link": "" if unk else link,
                         "qualificador": " ; ".join(quals), "desconhecido": unk})

@@ -48,6 +48,17 @@ def test_desconhecido_fica_marcado():
     for v in ("Por Confirmar", "Por identificar", "A identificar", "Ainda não identificado", "Sem Diálogos", "N/D"):
         assert names(v) == [("", "", True)], v
 
+def test_ponto_e_virgula_dentro_de_parenteses_nao_divide():
+    assert names("[[Fulana Tal]] (criança; 1ª temp.)") == [("Fulana Tal", "criança; 1ª temp.", False)]
+
+def test_pedaco_so_de_episodio_vira_qualificador():
+    assert names("[[Fulano]] ; 1x06") == [("Fulano", "1x06", False)]
+    assert names("[[Fulano]]<br>2ª-4ª Temp") == [("Fulano", "2ª-4ª Temp", False)]
+
+def test_mantido_no_original_e_desconhecido():
+    for v in ("Mantido no original", "Mantido no Original", "¿?", "Sem dialógos"):
+        assert names(v)[0][2], v
+
 def test_dublador_desconhecido_numerado_e_uma_pessoa():
     assert names("[[Dublador Desconhecido nº 9]]") == [("Dublador Desconhecido nº 9", "", False)]
 
