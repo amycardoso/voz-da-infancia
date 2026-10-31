@@ -18,8 +18,12 @@ from parse_obras import clean, load, parse_page, wtext
 # ---------------------------------------------------------------- nomes
 
 QUOTES = str.maketrans({"“": '"', "”": '"', "„": '"', "«": '"', "»": '"', "‘": "'", "’": "'", "´": "'", "`": "'"})
-UNKNOWN = re.compile(r"(?i)^(\?+|n/?a|-+|—|–|desconhecid[oa]s?|não identificad[oa]s?|não creditad[oa]s?|"
-                     r"sem dublagem|não dublad[oa]|a confirmar|indefinid[oa]|ninguém)$")
+# marcadores de vaga; "Dublador Desconhecido nº 6" NÃO entra: é uma voz recorrente com ficha própria
+UNKNOWN = re.compile(r"(?i)^(\?+|n/?[ad]|-+|—|–|desconhecid[oa]s?|(ainda )?não (identificad|creditad|confirmad|revelad|especificad)[oa]s?|"
+                     r"sem dublagem|não dublad[oa]|(a|por) (confirmar|identificar|adicionar)|sem identificar|indefinid[oa]|"
+                     r"ninguém|sem diálogos?|não aparece)$")
+# no lado do ator original, papéis que não são uma pessoa
+NOT_PERSON = re.compile(r"(?i)^(locução( e placas)?|locutora?|narra(dor|dora|ção)|vários|vozes adicionais)$")
 
 def normalize_name(s):
     """Nome para exibição: sem marcação wiki residual, aspas e espaços padronizados."""
@@ -296,7 +300,7 @@ def main(raw, out):
                 n_in += 1
                 estudio, diretor, status = studio_for(r["versao"], st, di)
                 dubs = split_cell(r["_dub_wt"]) or [{"nome": "", "link": "", "qualificador": "", "desconhecido": True}]
-                origs = [o for o in split_cell(r["_orig_wt"]) if not o["desconhecido"]]
+                origs = [o for o in split_cell(r["_orig_wt"]) if not o["desconhecido"] and not NOT_PERSON.match(o["nome"])]
                 for o, x in pair(origs, dubs):
                     oid, ofi = people.resolve(o["nome"], o["link"])
                     did, dfi = people.resolve(x["nome"], x["link"])

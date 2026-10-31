@@ -45,6 +45,11 @@ def test_desconhecido_fica_marcado():
     assert names("?") == [("", "", True)]
     assert names("N/A") == [("", "", True)]
     assert names("? (canções)") == [("", "canções", True)]
+    for v in ("Por Confirmar", "Por identificar", "A identificar", "Ainda não identificado", "Sem Diálogos", "N/D"):
+        assert names(v) == [("", "", True)], v
+
+def test_dublador_desconhecido_numerado_e_uma_pessoa():
+    assert names("[[Dublador Desconhecido nº 9]]") == [("Dublador Desconhecido nº 9", "", False)]
 
 def test_ref_e_imagem_somem():
     assert names("[[Arquivo:x.png|80px]][[Ana Lúcia Menezes]]<ref>fonte</ref>") == [("Ana Lúcia Menezes", "", False)]

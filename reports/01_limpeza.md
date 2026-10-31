@@ -9,15 +9,15 @@ Entrada: as tabelas de elenco das obras (`obras_elenco.csv`). Saída: `data/proc
 
 | | Antes | Depois |
 |---|---:|---:|
-| Linhas | 416.991 | 420.769 |
-| Linhas com dublador desconhecido ("?", "N/A"…) | 10,0% (texto solto) | 10,2% (`dublador_desconhecido=True`, linha mantida) |
-| Dubladores únicos | 17.969 nomes escritos de formas diferentes | **6.783 ids** |
+| Linhas | 416.991 | 420.758 |
+| Linhas com dublador desconhecido ("?", "N/A", "Por Confirmar"…) | 11,4% (texto solto) | 11,5% (`dublador_desconhecido=True`, linha mantida) |
+| Dubladores únicos | 17.938 nomes escritos de formas diferentes | **6.774 ids** |
 | Dubladores únicos ligados a uma ficha | 3.521 (nome idêntico ao título) | 3.661 |
-| Linhas com dublador ligado a uma ficha | 89,9% | **96,8%** |
-| Atores originais únicos | 115.945 nomes | 109.643 ids |
-| Linhas com ator original ligado a uma ficha | 27,9% | 30,4% |
+| Linhas com dublador ligado a uma ficha | 91,3% | **98,2%** |
+| Atores originais únicos | 115.945 nomes | 109.628 ids |
+| Linhas com ator original ligado a uma ficha | 27,9% | 30,5% |
 | Linhas com gênero do ator original | — | 19,9% (65,4% entre os que têm ficha) |
-| Linhas com gênero do dublador | — | 0,8% |
+| Linhas com gênero do dublador | — | 0,9% |
 | Células compostas | 3,2% das linhas, com " ; ", " / " ou parênteses | separadas; 5,2% das linhas têm `qualificador` |
 | Ano | texto ("1994-2004 ; 1998-2004") | `ano` numérico (o primeiro ano) em 98,6% das linhas |
 | Mídia | 8 valores, vazia em 7,5% | 14 valores; "outro" em 5,0% |
@@ -51,7 +51,7 @@ Entre as linhas de obras com mais de um estúdio, 46,4% foram ligadas à versão
 
 ## 3 casos difíceis
 
-1. **Rótulo ≠ ficha.** Em *.hack//SIGN*, Morgana está como `[[Sandra Mara Azevedo|Sandra Mara]] <small>(eps. 1-18)</small>`. Pelo texto, "Sandra Mara" não casaria com nenhuma ficha. Pelo alvo do link, vira `p:Sandra Mara Azevedo` com o qualificador "eps. 1-18". Esse caminho, somado aos redirecionamentos, levou a ligação com fichas de 89,9% para 96,8% das linhas.
+1. **Rótulo ≠ ficha.** Em *.hack//SIGN*, Morgana está como `[[Sandra Mara Azevedo|Sandra Mara]] <small>(eps. 1-18)</small>`. Pelo texto, "Sandra Mara" não casaria com nenhuma ficha. Pelo alvo do link, vira `p:Sandra Mara Azevedo` com o qualificador "eps. 1-18". Esse caminho, somado aos redirecionamentos, levou a ligação com fichas de 91,3% para 98,2% das linhas.
 2. **Personagem e dublador compostos ao mesmo tempo.** Em *007 Contra a Chantagem Atômica*, o personagem é "Emilio Largo / No. 2" e a célula do dublador é `[[Alfredo Martins]]<br>[[Carlos Marques]]<br><small>(1 loop)</small>`. O dublador é separado em Alfredo Martins e Carlos Marques (qualificador "1 loop"), mas o personagem não. Não dá para saber, só pela célula, quem dubla qual papel, então as duas linhas ficam com o personagem composto.
 3. **Estúdio por temporada sem temporada no elenco.** *31 Minutos* tem Álamo (1ª-2ª temps.) e UniDub (3ª-4ª temps.) no infobox, mas as tabelas são "Elenco" e "Personagens da Parada Top" e não dizem a temporada. Essas linhas ficam como `ambiguo`, com "Álamo ; UniDub".
 
@@ -63,4 +63,4 @@ Entre as linhas de obras com mais de um estúdio, 46,4% foram ligadas à versão
 - **Personagens**: não foram separados nem normalizados entre obras (caso 2).
 - **Qualificadores**: misturam tipos diferentes (ordem de voz, episódios, canções, idade do personagem, "?" de incerteza) e ainda não foram classificados.
 - **Franquias**: a raiz de título pode juntar obras homônimas sem relação. Para validação isso é conservador. O rótulo às vezes sai estranho: "Jason X" nomeia o grupo que junta Sexta-Feira 13 e A Hora do Pesadelo, ligados pelo crossover Freddy vs. Jason, e franquias sem ligação de infobox e com títulos diferentes ficam separadas.
-- **Dublador desconhecido**: 10,2% das linhas. São mantidas e marcadas.
+- **Dublador desconhecido**: 11,5% das linhas. São mantidas e marcadas. Contam como desconhecidos "?", "N/A", "N/D" e os marcadores de vaga da wiki ("Por Confirmar", "Por identificar", "Por adicionar", "Sem Diálogos"…). "Dublador Desconhecido nº 9" e similares ficam como pessoas: são vozes recorrentes não identificadas, com ficha própria. Do lado do ator original, "Locução", "Narrador" e "Vários" não contam como pessoa.
