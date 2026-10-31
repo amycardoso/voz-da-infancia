@@ -1,38 +1,29 @@
-"""Extrai a tabela obra|ano|midia|estudio|diretor|versao|personagem|ator_original|dublador do HTML renderizado."""
+"""Extrai obra|versao|ano|midia|estudio|diretor|personagem|ator_original|dublador das tabelas de elenco (wikitext)."""
 import csv, json, re, sys
-from html.parser import HTMLParser
+from collections import Counter
 from pathlib import Path
 
-class Tables(HTMLParser):
-    """Coleta tabelas (célula = texto, rowspan, colspan, is_header) e o último heading antes de cada uma."""
-    def __init__(self):
-        super().__init__(convert_charrefs=True)
-        self.tables, self.stack, self.heading, self.in_h, self.skip = [], [], "", None, 0
-    def handle_starttag(self, tag, a):
-        a = dict(a)
-        if tag in ("h2", "h3", "h4"): self.in_h, self.htext = tag, ""
-        if tag in ("sup", "style", "script"): self.skip += 1
-        if tag == "table": self.stack.append({"heading": self.heading, "rows": [], "cell": None})
-        if not self.stack: return
-        t = self.stack[-1]
-        if tag == "tr": t["rows"].append([])
-        elif tag in ("td", "th") and t["rows"] is not None:
-            if not t["rows"]: t["rows"].append([])
-            t["cell"] = {"text": "", "h": tag == "th",
-                         "rs": int(re.sub(r"\D", "", a.get("rowspan", "1")) or 1),
-                         "cs": int(re.sub(r"\D", "", a.get("colspan", "1")) or 1)}
-            t["rows"][-1].append(t["cell"])
-        elif tag in ("hr", "br") and t["cell"] is not None: t["cell"]["text"] += " ; " if tag == "hr" else " "
-    def handle_endtag(self, tag):
-        if tag in ("sup", "style", "script"): self.skip = max(0, self.skip - 1)
-        if tag == self.in_h:
-            self.heading, self.in_h = re.sub(r"\s+", " ", self.htext.replace("[editar]", "")).strip(), None
-        if self.stack and tag in ("td", "th"): self.stack[-1]["cell"] = None
-        if tag == "table" and self.stack: self.tables.append(self.stack.pop())
-    def handle_data(self, d):
-        if self.skip: return
-        if self.in_h: self.htext += d
-        if self.stack and self.stack[-1]["cell"] is not None: self.stack[-1]["cell"]["text"] += d
+import wikitable
+
+REF = re.compile(r"<ref[^>]*?/>|<ref.*?</ref>|<!--.*?-->", re.S)
+FILE = re.compile(r"\[\[(?:Arquivo|Ficheiro|File|Imagem|Image):[^\[\]]*(?:\[\[[^\]]*\]\][^\[\]]*)*\]\]", re.I)
+LINK = re.compile(r"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]")
+EXT = re.compile(r"\[(?:https?:)?//[^\s\]]+\s*([^\]]*)\]")
+KEEP = re.compile(r"\{\{\s*(?:nowrap|tooltip|small|nobr|lang|pequen[oa]\d*)\s*\|([^{}|]*)[^{}]*\}\}", re.I)
+
+def wtext(s):
+    """Wikitext de uma célula -> texto: tira refs, imagens e predefinições; links viram o rótulo."""
+    s = REF.sub("", s)
+    s = re.sub(r"<sup.*?</sup>", "", s, flags=re.S | re.I)
+    s = FILE.sub("", s)
+    s = re.sub(r"<hr[^>]*>|\n-{4,}", " ; ", s, flags=re.I)
+    s = re.sub(r"<br\s*/?>|\n", " ", s, flags=re.I)
+    for _ in range(3):
+        s = KEEP.sub(r"\1", s)
+        s = re.sub(r"\{\{[^{}]*\}\}", " ", s)
+    s = LINK.sub(r"\1", EXT.sub(r"\1", s))
+    s = re.sub(r"<[^>]+>|'{2,}|__\w+__", "", s)
+    return s.replace("&nbsp;", " ").replace("&amp;", "&")
 
 def grid(rows):
     """Expande rowspan/colspan numa grade retangular."""
@@ -60,7 +51,7 @@ def grid(rows):
         out.append(line)
     return out
 
-clean = lambda s: re.sub(r"\s*;\s*$", "", re.sub(r"\s+", " ", s)).strip(" ;")
+clean = lambda s: re.sub(r"\s*;\s*$", "", re.sub(r"\s+", " ", s)).strip(" ;|")
 
 def cast_rows(table):
     g = grid(table["rows"])
@@ -76,11 +67,17 @@ def cast_rows(table):
     ncol = max(len(r) for r in g)
     names = [" ".join(dict.fromkeys(clean(r[i]["text"]) for r in hdr if i < len(r))).lower() for i in range(ncol)]
     find = lambda *keys: next((i for i, n in enumerate(names) if any(k in n for k in keys)), None)
-    ip = find("personage", "papel")
+    ip = find("personage", "persongem", "papel")
     idub = find("dublador", "dublagem", "voz brasileira", "dubladora", "versão brasileira")
     iorig = find("diálogo") if find("diálogo") is not None else find("origina", "seiy", "ator", "atriz", "intérprete", "elenco")
+    real = False
+    if ip is None and idub is not None:
+        ip = find("pessoa", "participante", "apresenta", "jurado", "convidado", "elenco")
+        real = ip is not None  # reality/documentário: a pessoa é o próprio original
+        if ip is None and names and not names[0].strip() and idub != 0: ip = 0  # 1ª coluna sem título
     if ip is None or idub is None or idub == ip: return None
-    if iorig in (ip, idub): iorig = None
+    if real: iorig = ip
+    elif iorig in (ip, idub): iorig = None
     res = []
     for r in body:
         get = lambda i: clean(r[i]["text"]) if i is not None and i < len(r) else ""
@@ -95,7 +92,7 @@ def infobox(wt, *keys):
         for m in re.finditer(r"\|+\s*" + k + r"(?:_\d+)?\s*=(.*)$", wt, re.M):
             v = m.group(1)
             for _ in range(3): v = re.sub(r"\{\{[^{}]*\}\}", " ", v)
-            v = re.sub(r"\{\{.*", "", v)
+            v = re.sub(r"\{\{.*", "", v).replace("}}", "")
             v = re.sub(r"\[\[(?:[^|\]]*\|)?([^\]]*)\]\]", r"\1", v)
             v = re.sub(r"<hr[^>]*>|<br\s*/?>", " ; ", v)
             v = clean(re.sub(r"<[^>]+>|''+", " ", v).split("|")[0])
@@ -103,34 +100,70 @@ def infobox(wt, *keys):
         if vals: return " ; ".join(vals)
     return ""
 
-MEDIA = [("Jogos_Eletrônicos", "game"), ("Novelas", "novela"), ("Anime", "anime"), ("Séries_de_anime", "anime"),
-         ("Filmes_Animados", "filme animado"), ("Filmes", "filme"), ("Séries_Animadas", "série animada"),
-         ("Desenhos_animados", "série animada"), ("Séries", "série")]
+MEDIA = [("Jogos Eletrônicos", "game"), ("Novelas", "novela"), ("Anime", "anime"), ("Séries de anime", "anime"),
+         ("Filmes Animados", "filme animado"), ("Filmes", "filme"), ("Séries Animadas", "série animada"),
+         ("Desenhos animados", "série animada"), ("Séries", "série")]
 
 def media(cats):
     return next((m for c, m in MEDIA if c in cats), "")
 
+def load(raw, kind):
+    """Páginas do cache (data/raw/pages/*.jsonl) de um tipo: obra, dublador, ator, estudio, diretor."""
+    for f in sorted((Path(raw) / "pages").glob("part-*.jsonl")):
+        for line in f.open():
+            try: d = json.loads(line)
+            except json.JSONDecodeError: continue
+            if kind in d.get("kinds", []): yield d
+
+def parse_page(d):
+    """(linhas, motivo da falha ou "")."""
+    wt = d.get("wikitext") or ""
+    if d.get("missing") or not wt: return [], "página sem conteúdo"
+    if re.match(r"(?i)\s*#(redirect|redirecionamento)", wt): return [], "redirecionamento"
+    meta = dict(obra=d["title"], ano=infobox(wt, "ano", "lançamento", "data_de_lançamento", "exibição"),
+                midia=media(d.get("categories", [])),
+                estudio=infobox(wt, "estúdio_de_dublagem", "estúdio"),
+                diretor=infobox(wt, "direção_de_dublagem", "diretor_de_dublagem"))
+    tabs = wikitable.tables(wt)
+    if not tabs:
+        if re.search(r"(?i)\{\{\s*(elenco|dublagem|personagem)", wt): return [], "elenco em predefinição, sem tabela"
+        if re.search(r"(?im)^=+\s*elenco", wt): return [], "seção Elenco sem tabela (lista ou vazia)"
+        return [], "sem tabela"
+    rows, n_cast = [], 0
+    for t in tabs:
+        for r in t["rows"]:
+            for c in r: c["text"] = wtext(c["text"])
+        cr = cast_rows(t)
+        if cr is None: continue
+        n_cast += 1
+        for per, orig, dub in cr:
+            rows.append({"obra": meta["obra"], "versao": clean(wtext(t["heading"])), "ano": meta["ano"],
+                         "midia": meta["midia"], "estudio": meta["estudio"], "diretor": meta["diretor"],
+                         "personagem": per, "ator_original": orig, "dublador": dub})
+    if rows: return rows, ""
+    if n_cast: return [], "tabela de elenco sem linhas preenchidas"
+    heads = [" ".join(c["text"] for c in t["rows"][0]).lower() for t in tabs if t["rows"]]
+    if any("personage" in h and "origina" in h for h in heads):
+        return [], "produção nacional: só a coluna de vozes originais"
+    return [], "tabelas sem colunas Personagem/Dublador"
+
+FIELDS = ["obra", "versao", "ano", "midia", "estudio", "diretor", "personagem", "ator_original", "dublador"]
+
 if __name__ == "__main__":
-    src, out = Path(sys.argv[1]), Path(sys.argv[2])
-    stats, rows = [], []
-    for f in sorted(src.glob("*.json")):
-        d = json.loads(f.read_text())
-        p = Tables(); p.feed(d["html"])
-        wt = d["wikitext"]
-        meta = dict(obra=d["title"], ano=infobox(wt, "ano", "lançamento", "data_de_lançamento", "exibição"),
-                    midia=media(d["categories"]),
-                    estudio=infobox(wt, "estúdio_de_dublagem", "estúdio"),
-                    diretor=infobox(wt, "direção_de_dublagem", "diretor_de_dublagem"))
-        n_tab, n = 0, 0
-        for t in p.tables:
-            cr = cast_rows(t)
-            if cr:
-                n_tab += 1
-                for per, orig, dub in cr:
-                    rows.append({**meta, "versao": t["heading"], "personagem": per, "ator_original": orig, "dublador": dub}); n += 1
-        stats.append((d["title"], meta["midia"], len(p.tables), n_tab, n))
-    rows = list({tuple(r.values()): r for r in rows}.values())  # rowspan em colunas ignoradas duplica linhas
-    with out.open("w", newline="") as fh:
-        w = csv.DictWriter(fh, fieldnames=list(rows[0].keys()) if rows else ["obra"]); w.writeheader(); w.writerows(rows)
-    for s in stats: print("%-40s %-15s tabelas=%3d elenco=%3d linhas=%4d" % s)
-    print("TOTAL linhas", len(rows), "| páginas com elenco", sum(1 for s in stats if s[4]), "/", len(stats))
+    raw, out = Path(sys.argv[1]), Path(sys.argv[2])
+    out.parent.mkdir(parents=True, exist_ok=True)
+    fails, n_pages, n_ok, seen = Counter(), 0, 0, set()
+    with out.open("w", newline="") as fh, (out.parent / "obras_falhas.csv").open("w", newline="") as ff:
+        w = csv.DictWriter(fh, fieldnames=FIELDS); w.writeheader()
+        wf = csv.writer(ff); wf.writerow(["obra", "motivo"])
+        for d in load(raw, "obra"):
+            n_pages += 1
+            rows, why = parse_page(d)
+            if why: fails[why] += 1; wf.writerow([d["title"], why]); continue
+            n_ok += 1
+            for r in rows:
+                k = tuple(r.values())
+                if k in seen: continue  # rowspan em colunas ignoradas duplica linhas
+                seen.add(k); w.writerow(r)
+    print(f"obras: {n_pages} | com elenco: {n_ok} ({n_ok / max(n_pages, 1):.1%}) | linhas: {len(seen)}")
+    for why, n in fails.most_common(): print(f"  {n:6d}  {why}")
