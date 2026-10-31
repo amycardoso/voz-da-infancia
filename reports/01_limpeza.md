@@ -16,8 +16,8 @@ Entrada: as tabelas de elenco das obras (`obras_elenco.csv`). Saída: `data/proc
 | Linhas com dublador ligado a uma ficha | 91,3% | **98,2%** |
 | Atores originais únicos | 115.945 nomes | 109.628 ids |
 | Linhas com ator original ligado a uma ficha | 27,9% | 30,5% |
-| Linhas com gênero do ator original | — | 19,9% (65,4% entre os que têm ficha) |
-| Linhas com gênero do dublador | — | 0,9% |
+| Linhas com gênero do ator original | — | 19,9% (65,4% entre os que têm ficha); 26,9% depois de `scripts/gender.py`, que lê também as fichas de seiyuu |
+| Linhas com gênero do dublador | — | 0,9% nesta etapa; 99,2% depois de `scripts/gender.py` |
 | Células compostas | 3,2% das linhas, com " ; ", " / " ou parênteses | separadas; 5,2% das linhas têm `qualificador` |
 | Ano | texto ("1994-2004 ; 1998-2004") | `ano` numérico (o primeiro ano) em 98,6% das linhas |
 | Mídia | 8 valores, vazia em 7,5% | 14 valores; "outro" em 5,0% |
